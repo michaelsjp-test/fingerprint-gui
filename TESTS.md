@@ -6,6 +6,29 @@ This document provides information on how automated agents can use the testing a
 
 The fingerprint-gui project includes automated testing scripts designed to work with Wayland display servers, specifically tested with KDE Plasma on Wayland. These scripts use `ydotool` for input automation.
 
+
+## Debug execution
+
+To build the project run the following commands:
+
+```bash
+mkdir build
+cmake -B build && make -j$(nproc) -C build
+```
+
+To start the binary in debug mode, run:
+
+```bash
+# From the project root directory
+./build/bin/fingerprint-gui -d
+```
+
+For detailed logging with gdb, you can use the following command:
+
+```bash
+timeout 60s gdb -ex run -ex bt -ex quit --args ./bin/fingerprint-gui -d              
+```
+
 ## Scripts Location
 
 All development and testing helper scripts are located in the `dev-helper/` directory:
