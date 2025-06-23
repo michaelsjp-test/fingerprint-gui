@@ -46,25 +46,21 @@ using namespace std;
 //drivername is not sufficient to indentify a device (several devices might use
 //the same driver).
 #include <libusb-1.0/libusb.h>
-struct fp_dscv_dev {
-	struct libusb_device *udev;
-	struct fp_driver *drv;
-	unsigned long driver_data;
-	uint32_t devtype;
-};
+#include <glib.h>
+#include <glib-object.h>
 
 class GenericDevice : public FingerprintDevice
  {
     string displayName;
     string driverName;
-    struct fp_dscv_dev *fpDevice;
-    struct fp_dev *dev;
+    FpDevice *fpDevice;
+    FpDevice *dev;
     int mode;
-    struct fp_print_data *fpData;
-    struct fp_print_data **identifyData;
+    FpPrint *fpData;
+    GPtrArray *identifyData;
 
 public:
-    GenericDevice(struct fp_dscv_dev *fp,USBDevice *knownUSBDevices=NULL);
+    GenericDevice(FpDevice *fp, USBDevice *knownUSBDevices=NULL);
     void emitAcquireResult(int result);
     void emitVerifyResult(int result);
     string* getDisplayName(int);            //returns a display name for this device
@@ -79,7 +75,7 @@ public:
 protected:
     void run();
 private :
-    bool fpDevOpen(struct fp_dscv_dev *fpDevice);
+    bool fpDevOpen(FpDevice *fpDevice);
     bool fpDevClose();
     bool acquire();
     bool verify();

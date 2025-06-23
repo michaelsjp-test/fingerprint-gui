@@ -6,5 +6,5 @@ ELSEIF(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
   DESTINATION "lib/")
 ENDIF()
 
-install(FILES 91-fingerprint-gui-upek.rules DESTINATION "lib/udev/rules.d")
+install(FILES "${CMAKE_SOURCE_DIR}/conf/udev/91-fingerprint-gui-upek.rules" DESTINATION "lib/udev/rules.d")
 install(FILES upek.cfg DESTINATION /etc)

@@ -1,7 +1,7 @@
 # Fingerprint GUI
 
 Fingerprint GUI is an application providing fingerprint-based authentication on
-Linux desktops. Based on the libfprint library, it features a simple GUI for
+Linux desktops. Based on the libfprint-2 library, it features a simple GUI for
 fingerprint management and a PAM module. Additionally, you may install the
 bundled non-free libbsapi library, in which case Fingerprint GUI will
 automatically support all fingerprint readers manufactured by UPEK, Inc.
@@ -31,15 +31,22 @@ qttranslations5-l10n qtbase5-dev-tools qttools5-dev-tools libqt5x11extras5-dev \
 ### Install dependencies
 
 In order to compile the software you will need cmake and the development
-packages for libfprint, libqca-qt5-2, libfakekey, libusb-1.0, libpolkit-qt5-1
+packages for libfprint-2, libqca-qt5-2, libfakekey, libusb-1.0, libpolkit-qt5-1
 and libpam.
 
 If you are running a recent Debian-based distribution, use the following
 command:
 
 ```bash
-sudo apt install -y cmake cmake-extras libfprint-dev libqca-qt5-2-dev \
+sudo apt install -y cmake cmake-extras libfprint-2-dev libqca-qt5-2-dev \
 libfakekey-dev libusb-1.0-0-dev libpolkit-qt5-1-dev libpam0g-dev
+```
+
+On Arch Linux systems you can install the dependencies with:
+
+```bash
+sudo pacman -S base-devel cmake qt5-base qt5-tools libfprint libqca-qt5 \
+libfakekey libusb libpolkit-qt5 pam
 ```
 
 ### Create the build directory

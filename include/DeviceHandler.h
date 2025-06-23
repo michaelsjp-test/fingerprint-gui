@@ -20,6 +20,8 @@
 #include <QObject>
 #include <QtWidgets>
 #include <string>
+#include <glib.h>
+#include <glib-object.h>
 
 #include "Globals.h"
 
@@ -53,8 +55,8 @@ class DeviceHandler : public QObject {
   USBDevice *knownUSBDevices; // Linked list of all known USB devices according
                               // to "usb.ids"
   USBDevice *attachedUSBDevices; // Linked list of all attached USB devices
-  struct fp_dscv_dev *
-      *discoveredFpDevices; // Fingerprint devices discovered by libfprint
+  GPtrArray *discoveredFpDevices; // Fingerprint devices discovered by libfprint
+  FpContext *fpContext;
   ABS_DEVICE_LIST
       *discoveredBsDevices; // Fingerprint devices discovered by libbsapi
   FingerprintDevice *fingerprintDevices; // Linked list of all attached and

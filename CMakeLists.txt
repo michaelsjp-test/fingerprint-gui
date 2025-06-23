@@ -15,7 +15,7 @@ find_package(PolkitQt5-1 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Qt5LinguistTools)
 pkg_check_modules(LIBUSB REQUIRED libusb-1.0)
-pkg_check_modules(LIBFPRINT REQUIRED libfprint)
+pkg_check_modules(LIBFPRINT REQUIRED libfprint-2)
 pkg_check_modules(FAKEKEY REQUIRED libfakekey)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
@@ -25,6 +25,7 @@ include_directories(${Qt5Core_INCLUDE_DIRS}
     ${Qt5Xml_INCLUDE_DIRS}
     ${Qt5X11Extras_INCLUDE_DIRS}
     ${Qca-qt5_INCLUDE_DIRS}
+    ${LIBFPRINT_INCLUDE_DIRS}
 
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/include"
@@ -46,6 +47,7 @@ add_subdirectory(upek)
 add_subdirectory(bin)
 add_subdirectory(locales)
 
-install(FILES COPYING DESTINATION "share/doc/fingerprint-gui/")
+# Install license file
+install(FILES LICENSE.md DESTINATION "share/doc/fingerprint-gui/" RENAME COPYING)
 install(DIRECTORY DESTINATION "/var/lib/fingerprint-gui")
 install(DIRECTORY DESTINATION "/var/upek_data")

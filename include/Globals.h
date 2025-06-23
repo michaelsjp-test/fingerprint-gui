@@ -25,8 +25,21 @@
 #define LICENSE "https://www.gnu.org/licenses/gpl-3.0-standalone.html"
 
 extern "C" {
-#include <libfprint/fprint.h>
+#ifdef signals
+#undef signals
+#endif
+#include <libfprint-2/fprint.h>
 }
+// Restore Qt's signal macro after including libfprint headers
+#ifdef Q_MOC_RUN
+#ifndef signals
+#define signals public
+#endif
+#else
+#ifndef QT_NO_SIGNALS_SLOTS_KEYWORDS
+#define signals Q_SIGNALS
+#endif
+#endif
 
 #define _MULTI_THREADED
 

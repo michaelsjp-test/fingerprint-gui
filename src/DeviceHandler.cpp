@@ -49,6 +49,7 @@ DeviceHandler::DeviceHandler(display_name_mode mode) {
   knownUSBDevices = nullptr;
   attachedUSBDevices = nullptr;
   discoveredFpDevices = nullptr;
+  fpContext = nullptr;
   discoveredBsDevices = nullptr;
   fingerprintDevices = nullptr;
   currentDevice = nullptr;
@@ -171,7 +172,7 @@ void DeviceHandler::rescan() {
 
   if (findAttachedUSBDevices() > 0) {
     if (discoveredFpDevices != nullptr)
-      fp_dscv_devs_free(discoveredFpDevices);
+      g_ptr_array_unref(discoveredFpDevices);
 
     /* Discover devices handled by proprietary driver libraries */
     // Discover devices handled by "libbsapi" from UPEK
@@ -198,10 +199,13 @@ void DeviceHandler::rescan() {
 
     // Discover "generic" devices handled by libfprint-2
     // This is the fallback for devices not handled by proprietary libraries
-    discoveredFpDevices = fp_discover_devs();
-    if (discoveredFpDevices != nullptr) {
-      for (int i = 0; discoveredFpDevices[i] != nullptr; i++) {
-        addDevice(new GenericDevice(discoveredFpDevices[i], knownUSBDevices));
+    if (discoveredFpDevices)
+      g_ptr_array_unref(discoveredFpDevices);
+    discoveredFpDevices = fp_context_get_devices(fpContext);
+    if (discoveredFpDevices != nullptr && discoveredFpDevices->len > 0) {
+      for (guint i = 0; i < discoveredFpDevices->len; i++) {
+        FpDevice *dev = (FpDevice *)g_ptr_array_index(discoveredFpDevices, i);
+        addDevice(new GenericDevice(dev, knownUSBDevices));
       }
     } else {
       syslog(LOG_ERR, "No devices found by libfprint-2.");
@@ -361,9 +365,10 @@ int DeviceHandler::release() {
     syslog(LOG_DEBUG, "Stopping device.");
     currentDevice->stop();
   }
-  // Exit libfprint-2
+  // Release libfprint-2 context
   syslog(LOG_DEBUG, "Exitting libfprint-2.");
-  fp_exit();
+  if (fpContext)
+    g_object_unref(fpContext);
 
   // Exit libbsapi
   if (bsapiHandle) {
@@ -380,12 +385,14 @@ int DeviceHandler::release() {
 // Initialize all devices
 int DeviceHandler::initialize() {
   // Initialize libfprint-2
-  if (fp_init() != 0) {
-    string message = "Unable to initialize libfprint-2.";
+  fpContext = fp_context_new();
+  if (!fpContext) {
+    string message = "Unable to create libfprint context.";
     syslog(LOG_ERR, "%s", message.data());
     cerr << message.data() << endl;
     return 0;
   }
+  fp_context_enumerate(fpContext);
   syslog(LOG_DEBUG, "Libfprint-2 initialized.");
 
   // Initialize libbsapi

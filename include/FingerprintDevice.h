@@ -80,7 +80,7 @@ public:
 
 protected:
   virtual void run() = 0;
-  void img_to_pixmap(struct fp_img *img) {
+  void img_to_pixmap(FpImage *img) {
     size_t rgb_offset = 0;
     size_t i;
     size_t size;
@@ -90,9 +90,9 @@ protected:
       fpPic.data = NULL;
     }
     if (NULL != img) {
-      imgdata = fp_img_get_data(img);
-      size = (fpPic.width = fp_img_get_width(img)) *
-             (fpPic.height = fp_img_get_height(img));
+      imgdata = (unsigned char *)fp_image_get_data(img, NULL);
+      size = (fpPic.width = fp_image_get_width(img)) *
+             (fpPic.height = fp_image_get_height(img));
       if (NULL != (fpPic.data = (unsigned char *)malloc(size * 3))) {
         for (i = 0; i < size; i++) {
           unsigned char pixel = imgdata[i];
