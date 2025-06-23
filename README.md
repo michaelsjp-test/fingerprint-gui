@@ -45,8 +45,8 @@ libfakekey-dev libusb-1.0-0-dev libpolkit-qt5-1-dev libpam0g-dev
 On Arch Linux systems you can install the dependencies with:
 
 ```bash
-sudo pacman -S base-devel cmake qt5-base qt5-tools libfprint libqca-qt5 \
-libfakekey libusb libpolkit-qt5 pam
+sudo pacman -S base-devel cmake qt5-base qt5-tools libfprint qca-qt5 \
+libfakekey libusb polkit-qt5 pam
 ```
 
 ### Create the build directory
