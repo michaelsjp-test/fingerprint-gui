@@ -168,7 +168,7 @@ void PolkitDialogImpl::createUserCombobox(
     userCombobox->clear();
     // Adds a Dummy user
     userCombobox->addItem(tr("Select User"),
-                          qVariantFromValue<QString>(QString()));
+                          QVariant::fromValue<QString>(QString()));
     qobject_cast<QStandardItemModel *>(userCombobox->model())
         ->item(userCombobox->count() - 1)
         ->setEnabled(false);
@@ -178,7 +178,7 @@ void PolkitDialogImpl::createUserCombobox(
       QString user(identity.toString().remove("unix-user:"));
       syslog(LOG_DEBUG, "Add user: %s.", user.toStdString().data());
       userCombobox->addItem(user,
-                            qVariantFromValue<QString>(identity.toString()));
+                            QVariant::fromValue<QString>(identity.toString()));
     }
 
     // Show the widget and set focus

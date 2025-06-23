@@ -28,7 +28,7 @@ class MessageDialogImpl : public QDialog, public Ui::MessageDialog {
   Q_OBJECT
 
 public:
-  MessageDialogImpl(QWidget *parent = 0, Qt::WindowFlags f = 0);
+  MessageDialogImpl(QWidget *parent = 0, Qt::WindowFlags f = Qt::WindowFlags());
 
 private slots:
   void ok();

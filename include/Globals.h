@@ -15,6 +15,9 @@
 #define _GLOBALS_H
 
 #include <syslog.h>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QCursor>
 
 #define VERSION "1.09"
 #define COPYRIGHT "© 2008-2016 Wolfgang Ullrich"
@@ -122,8 +125,9 @@ extern "C" {
 
 #define PLACE_DIALOG_TO_SCREEN_WHERE_CURSOR_IS                                 \
   int h = height();                                                            \
-  QRect desk_rect = QApplication::desktop()->screenGeometry(                   \
-      QApplication::desktop()->screenNumber(QCursor::pos()));                  \
+  QScreen* screen = QGuiApplication::screenAt(QCursor::pos());                 \
+  if (!screen) screen = QGuiApplication::primaryScreen();                      \
+  QRect desk_rect = screen->geometry();                                        \
   int x = desk_rect.left();                                                    \
   int y = desk_rect.height() - h + desk_rect.top();                            \
   int w = desk_rect.width();                                                   \
