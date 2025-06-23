@@ -104,6 +104,7 @@ class UpekDevice : public FingerprintDevice
 
 public:
     UpekDevice(void *,struct abs_device_list_item *bs,USBDevice *knownUSBDevices=NULL);
+    virtual ~UpekDevice();
     void emitAcquireResult(int result);
     void emitVerifyResult(int result);
     string* getDisplayName(int);            //returns a display name for this device
@@ -122,6 +123,7 @@ private :
     bool verify();
     bool identify();
     bool bsDevOpen(string bsDevice,ABS_CONNECTION *conn);
+    ABS_STATUS (*bsapiTerminateFunction)();
 };
 
 #endif /* _UPEKDEVICE_H */

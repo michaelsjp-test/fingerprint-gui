@@ -42,6 +42,8 @@ set(QT_LIBRARIES
     ${CMAKE_THREAD_LIBS_INIT}
         )
 set(LIBEXECDIR "${CMAKE_INSTALL_PREFIX}/lib/fingerprint-gui")
+# Debugging inclusion of subdirectories
+message("Including subdirectories: src, upek, bin, locales")
 add_subdirectory(src)
 add_subdirectory(upek)
 add_subdirectory(bin)

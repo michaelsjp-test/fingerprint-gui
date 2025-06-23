@@ -455,6 +455,7 @@ int main(int argc, char **argv) {
   sscanf(argv[2], "%d",
          &pipe_w); // Get the pipe handle for writing to pam_fingerprint-gui.so
   syslog(LOG_DEBUG, "Have pipe_r %d and pipe_w %d.", pipe_r, pipe_w);
+  syslog(LOG_DEBUG, "Helper process started with PID: %d.", getpid());
 
   syslog(LOG_DEBUG, "Have display=%s, XAUTHORITY=%s.", display, xauth);
   // syslog(LOG_DEBUG,"HELPER uid:%d, gid:%d.",getuid(),getgid());

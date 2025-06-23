@@ -65,6 +65,10 @@ UpekDevice::UpekDevice(void *libHandle, struct abs_device_list_item *bs,
   if ((error = dlerror()) != nullptr) {
     syslog(LOG_ERR, "Could not find symbol \"%s\" (%s).", BSAPI_SETLED, error);
   }
+  *(void **)(&bsapiTerminateFunction) = dlsym(bsapiHandle, BSAPI_TERMINATE);
+  if ((error = dlerror()) != nullptr) {
+    syslog(LOG_ERR, "Could not find symbol \"%s\" (%s).", BSAPI_TERMINATE, error);
+  }
 
   driverName = string("");
   displayName = string("");
@@ -609,4 +613,16 @@ bool UpekDevice::identify() {
   syslog(LOG_DEBUG, "Match result %u.", (int)match);
   emit matchResult(match, &fpPic);
   return true;
+}
+
+UpekDevice::~UpekDevice() {
+  if (bsapiHandle) {
+    syslog(LOG_DEBUG, "Terminating libbsapi for UpekDevice.");
+    if ((*bsapiTerminateFunction)() != 0) {
+      syslog(LOG_ERR, "Unable to terminate libbsapi for UpekDevice.");
+    }
+    dlclose(bsapiHandle);
+    bsapiHandle = nullptr;
+  }
+  syslog(LOG_DEBUG, "UpekDevice destroyed.");
 }

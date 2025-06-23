@@ -34,15 +34,72 @@ GenericDevice::GenericDevice(FpDevice *fp, USBDevice *knownUSBDevices)
   vendorId = 0;
   productId = 0;
 
-  driverName = string(fp_device_get_driver(fpDevice));
-  displayName = string(fp_device_get_name(fpDevice));
+  // Check if fpDevice is valid before accessing its properties
+  if (fpDevice == nullptr) {
+    syslog(LOG_ERR, "GenericDevice: fpDevice is null");
+    driverName = string("unknown");
+    displayName = string("unknown");
+    return;
+  }
+
+  // Safely get driver name with null check
+  const char *driver = fp_device_get_driver(fpDevice);
+  if (driver != nullptr) {
+    driverName = string(driver);
+  } else {
+    syslog(LOG_WARNING, "GenericDevice: fp_device_get_driver returned null");
+    driverName = string("unknown");
+  }
+
+  // Safely get device name with null check
+  const char *name = fp_device_get_name(fpDevice);
+  if (name != nullptr) {
+    displayName = string(name);
+  } else {
+    syslog(LOG_WARNING, "GenericDevice: fp_device_get_name returned null");
+    displayName = string("unknown");
+  }
+
   syslog(LOG_INFO, "initializing libfprint device driver: %s", driverName.data());
+}
+
+GenericDevice::~GenericDevice() {
+  // Add debug logs to trace object lifecycle
+  if (dev != nullptr) {
+    syslog(LOG_DEBUG, "Closing device: %s", driverName.data());
+    fpDevClose();
+  }
+
+  if (fpData != nullptr) {
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing fpData: %p", fpData);
+    g_object_unref(fpData);
+    syslog(LOG_DEBUG, "Unreferenced fpData: %p", fpData);
+    fpData = nullptr;
+  }
+
+  if (identifyData != nullptr) {
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing identifyData: %p", identifyData);
+    g_ptr_array_unref(identifyData);
+    syslog(LOG_DEBUG, "Unreferenced identifyData: %p", identifyData);
+    identifyData = nullptr;
+  }
+
+  syslog(LOG_DEBUG, "GenericDevice destroyed: %s", driverName.data());
 }
 
 // Public getters and setters
 string *GenericDevice::getDisplayName(int mode) {
-  if (mode == DISPLAY_DRIVER_NAME)
+  if (mode == DISPLAY_DRIVER_NAME) {
+    if (driverName.empty()) {
+      driverName = "unknown_driver";
+    }
     return &driverName;
+  }
+  if (displayName.empty()) {
+    displayName = "unknown_device";
+  }
   return &displayName;
 }
 
@@ -74,13 +131,15 @@ void GenericDevice::setIdentifyData(FingerprintData *iData) {
 
 bool GenericDevice::canIdentify() {
   bool rc = false;
-  if (fpDevice == nullptr) { // Oops!
-    syslog(LOG_ERR, "FIXME: fpDevice nullptr.");
+  if (fpDevice == nullptr) {
+    syslog(LOG_ERR, "GenericDevice::canIdentify: fpDevice is null");
     return rc;
   }
+
   if (!fpDevOpen(fpDevice)) {
     return rc;
   }
+
   if (fp_device_has_feature(dev, FP_DEVICE_FEATURE_IDENTIFY))
     rc = true;
   fpDevClose();
@@ -148,9 +207,10 @@ void GenericDevice::stop() {
 // Open the fingerprint_device
 bool GenericDevice::fpDevOpen(FpDevice *fpDevice) {
   if (fpDevice == nullptr) {
-    syslog(LOG_ERR, "FIXME: fpDevice nullptr.");
+    syslog(LOG_ERR, "GenericDevice::fpDevOpen: fpDevice is null");
     return false;
   }
+
   GError *error = nullptr;
   if (!fp_device_open_sync(fpDevice, nullptr, &error)) {
     syslog(LOG_ERR, "Could not open fpDevice: %s", error ? error->message : "unknown");
@@ -164,9 +224,10 @@ bool GenericDevice::fpDevOpen(FpDevice *fpDevice) {
 
 bool GenericDevice::fpDevClose() {
   if (!dev) {
-    syslog(LOG_ERR, "FIXME: dev nullptr (fpDevClose).");
+    syslog(LOG_DEBUG, "GenericDevice::fpDevClose: dev is already null");
     return false;
   }
+
   syslog(LOG_DEBUG, "FP_DEV_CLOSE.");
   GError *error = nullptr;
   if (!fp_device_close_sync(dev, nullptr, &error)) {
@@ -211,7 +272,10 @@ bool GenericDevice::verify() {
     FpImage *img = fp_print_get_image(scan);
     if (img)
       img_to_pixmap(img);
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing scan: %p", scan);
     g_object_unref(scan);
+    syslog(LOG_DEBUG, "Unreferenced scan: %p", scan);
   } else {
     img_to_pixmap(nullptr);
   }
@@ -290,7 +354,10 @@ bool GenericDevice::identify() {
     FpImage *img = fp_print_get_image(scan);
     if (img)
       img_to_pixmap(img);
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing scan: %p", scan);
     g_object_unref(scan);
+    syslog(LOG_DEBUG, "Unreferenced scan: %p", scan);
   } else {
     img_to_pixmap(nullptr);
   }
@@ -302,7 +369,10 @@ bool GenericDevice::identify() {
         break;
       }
     }
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing match_print: %p", match_print);
     g_object_unref(match_print);
+    syslog(LOG_DEBUG, "Unreferenced match_print: %p", match_print);
   }
   fpDevClose();
   if (fpData != nullptr) {

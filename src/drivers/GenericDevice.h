@@ -38,11 +38,11 @@
 
 using namespace std;
 
-//This struct was copied from libfprint "fp_internal.h" is used only for 
+//This struct was copied from libfprint "fp_internal.h" is used only for
 //getting the vendorID and productID of the device to build the display name from.
 //This might lead to weird results if the struct is changed in future versions
-//of libfprint. It had have been a wise decision to provide a getter function for 
-//vendorID and productID of the discovered device in libfprint because the 
+//of libfprint. It had have been a wise decision to provide a getter function for
+//vendorID and productID of the discovered device in libfprint because the
 //drivername is not sufficient to indentify a device (several devices might use
 //the same driver).
 #include <libusb-1.0/libusb.h>
@@ -61,6 +61,7 @@ class GenericDevice : public FingerprintDevice
 
 public:
     GenericDevice(FpDevice *fp, USBDevice *knownUSBDevices=NULL);
+    ~GenericDevice();
     void emitAcquireResult(int result);
     void emitVerifyResult(int result);
     string* getDisplayName(int);            //returns a display name for this device

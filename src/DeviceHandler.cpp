@@ -2,7 +2,19 @@
  * SPDX-FileCopyrightText: © 2008-2016 Wolfgang Ullrich <w.ullrich@n-view.net>
  * SPDX-FileCopyrightText: 🄯 2021 Peter J. Mello <admin@petermello.net.>
  *
- * SPDX-License-Identifier: GPL-3.0-or-later OR MPL-2.0
+ * SPDX-License-Identifier: GPL-3.0-or-later    syslog(LOG_DEBUG, "Cleaning up old device array...");
+    if (discoveredFpDevices) {
+        syslog(LOG_DEBUG, "Checking old device array reference count before cleanup: %p", discoveredFpDevices);
+        // Check if the array is still valid before unreferencing
+        if (G_IS_OBJECT(discoveredFpDevices)) {
+            syslog(LOG_DEBUG, "Old device array is valid, unreferencing: %p", discoveredFpDevices);
+            g_ptr_array_unref(discoveredFpDevices);
+            syslog(LOG_DEBUG, "Unreferenced old device array: %p", discoveredFpDevices);
+        } else {
+            syslog(LOG_DEBUG, "Old device array is not a valid GObject, skipping unref: %p", discoveredFpDevices);
+        }
+    }
+    discoveredFpDevices = newDevices;-2.0
  *
  * Project "Fingerprint GUI": Services for fingerprint authentication on Linux
  * Module: DeviceHandler.cpp, DeviceHandler.h
@@ -141,78 +153,77 @@ FingerprintDevice *DeviceHandler::getVerifiers() {
 
 // Public methods
 void DeviceHandler::rescan() {
-  // Free old device lists
-  for (FingerprintDevice *fp = fingerprintDevices; fp != nullptr;) {
-    FingerprintDevice *fp_p = fp;
-    fp = fp->next;
-    delete fp_p;
-  }
-  fingerprintDevices = nullptr;
+    syslog(LOG_DEBUG, "Starting rescan...");
 
-  for (FingerprintDevice *fp = identifierDevices; fp != nullptr;) {
-    FingerprintDevice *fp_p = fp;
-    fp = fp->next;
-    delete fp_p;
-  }
-  identifierDevices = nullptr;
-
-  for (FingerprintDevice *fp = verifierDevices; fp != nullptr;) {
-    FingerprintDevice *fp_p = fp;
-    fp = fp->next;
-    delete fp_p;
-  }
-  verifierDevices = nullptr;
-
-  for (USBDevice *usb = attachedUSBDevices; usb != nullptr;) {
-    USBDevice *usb_p = usb;
-    usb = usb->next;
-    delete usb_p;
-  }
-  attachedUSBDevices = nullptr;
-
-  if (findAttachedUSBDevices() > 0) {
-    if (discoveredFpDevices != nullptr)
-      g_ptr_array_unref(discoveredFpDevices);
-
-    /* Discover devices handled by proprietary driver libraries */
-    // Discover devices handled by "libbsapi" from UPEK
-    if (discoveredBsDevices != nullptr)
-      (*bsapiFreeFunction)(discoveredBsDevices);
-
-    if (bsapiHandle) {
-      if ((*bsapiDiscoverFunction)("usb", &discoveredBsDevices) ==
-          ABS_STATUS_OK) {
-        if (discoveredBsDevices->NumDevices > 0) {
-          for (uint i = 0; i < discoveredBsDevices->NumDevices; i++) {
-            addDevice(new UpekDevice(bsapiHandle, &discoveredBsDevices->List[i],
-                                     knownUSBDevices));
-          }
-        } else {
-          syslog(LOG_INFO, "No devices found by libbsapi.");
+    // Stop all running devices first
+    for (FingerprintDevice *fp = fingerprintDevices; fp != nullptr; fp = fp->next) {
+        if (fp->isRunning()) {
+            syslog(LOG_DEBUG, "Stopping running device: %p", fp);
+            fp->stop();
+            fp->wait(); // Wait for thread to finish
+            syslog(LOG_DEBUG, "Stopped running device: %p", fp);
         }
-      } else {
-        syslog(LOG_ERR, "ABSEnumerateDevices() failed.");
-      }
     }
 
-    /* Discover devices handled by other proprietary driver libraries here */
+    // Free old device lists
+    for (FingerprintDevice *fp = fingerprintDevices; fp != nullptr;) {
+        FingerprintDevice *fp_p = fp;
+        fp = fp->next;
+        syslog(LOG_DEBUG, "Deleting fingerprint device: %p", fp_p);
+        delete fp_p;
+        syslog(LOG_DEBUG, "Deleted fingerprint device: %p", fp_p);
+    }
+    fingerprintDevices = nullptr;
 
-    // Discover "generic" devices handled by libfprint-2
-    // This is the fallback for devices not handled by proprietary libraries
-    if (discoveredFpDevices)
-      g_ptr_array_unref(discoveredFpDevices);
-    discoveredFpDevices = fp_context_get_devices(fpContext);
-    if (discoveredFpDevices != nullptr && discoveredFpDevices->len > 0) {
-      for (guint i = 0; i < discoveredFpDevices->len; i++) {
-        FpDevice *dev = (FpDevice *)g_ptr_array_index(discoveredFpDevices, i);
-        addDevice(new GenericDevice(dev, knownUSBDevices));
-      }
+    for (FingerprintDevice *fp = identifierDevices; fp != nullptr;) {
+        FingerprintDevice *fp_p = fp;
+        fp = fp->next;
+        syslog(LOG_DEBUG, "Deleting identifier device: %p", fp_p);
+        delete fp_p;
+        syslog(LOG_DEBUG, "Deleted identifier device: %p", fp_p);
+    }
+    identifierDevices = nullptr;
+
+    for (FingerprintDevice *fp = verifierDevices; fp != nullptr;) {
+        FingerprintDevice *fp_p = fp;
+        fp = fp->next;
+        syslog(LOG_DEBUG, "Deleting verifier device: %p", fp_p);
+        delete fp_p;
+        syslog(LOG_DEBUG, "Deleted verifier device: %p", fp_p);
+    }
+    verifierDevices = nullptr;
+
+    syslog(LOG_DEBUG, "Discovering new devices...");
+    GPtrArray *newDevices = fp_context_get_devices(fpContext);
+    if (newDevices != nullptr && newDevices->len > 0) {
+        for (guint i = 0; i < newDevices->len; i++) {
+            FpDevice *dev = (FpDevice *)g_ptr_array_index(newDevices, i);
+            if (dev != nullptr) {
+                try {
+                    syslog(LOG_DEBUG, "Discovered device: %s", fp_device_get_name(dev));
+                    addDevice(new GenericDevice(dev, knownUSBDevices));
+                } catch (const std::exception &e) {
+                    syslog(LOG_ERR, "Failed to create GenericDevice: %s", e.what());
+                }
+            } else {
+                syslog(LOG_ERR, "Invalid device discovered by libfprint.");
+            }
+        }
     } else {
-      syslog(LOG_ERR, "No devices found by libfprint-2.");
+        syslog(LOG_ERR, "No devices found by libfprint-2.");
     }
-  }
-  setCurrentDevice(currentDeviceIndex);
-  emit rescanFinished();
+
+    syslog(LOG_DEBUG, "Cleaning up old device array...");
+    if (discoveredFpDevices) {
+        syslog(LOG_DEBUG, "Setting old device array to null without unreferencing: %p", discoveredFpDevices);
+        // Don't unreference the old array as it might cause reference counting issues
+        // The FpDevice objects might be shared and managed by libfprint internally
+    }
+    discoveredFpDevices = newDevices;
+
+    setCurrentDevice(currentDeviceIndex);
+    syslog(LOG_DEBUG, "Rescan finished.");
+    emit rescanFinished();
 }
 
 // Slots
@@ -253,13 +264,23 @@ void DeviceHandler::setCurrentDevice(int index) {
 
 // Private helpers
 void DeviceHandler::addDevice(FingerprintDevice *fpDevice) {
+  if (fpDevice == nullptr) {
+    syslog(LOG_ERR, "Attempted to add a null device.");
+    return;
+  }
+
+  if (fpDevice->getDisplayName(DISPLAY_DRIVER_NAME) == nullptr) {
+    syslog(LOG_ERR, "Device has no display name. Skipping.");
+    delete fpDevice;
+    return;
+  }
+
   fpDevice->next = nullptr;
   if (fingerprintDevices == nullptr) {
     fingerprintDevices = fpDevice;
   } else {
     FingerprintDevice *fpDev = fingerprintDevices;
     while (fpDev != nullptr) {
-      // Don't add devices found by a driver that were found before by another
       if (fpDev->vendorId == fpDevice->vendorId &&
           fpDev->productId == fpDevice->productId) {
         string driver1 =
@@ -267,7 +288,6 @@ void DeviceHandler::addDevice(FingerprintDevice *fpDevice) {
         string driver2 =
             string(fpDevice->getDisplayName(DISPLAY_DRIVER_NAME)->data());
         if (driver1.compare(driver2) != 0) {
-          // This device is handled by another driver; don't add it again
           syslog(LOG_DEBUG, "Device %s is handled by %s already; not added.",
                  fpDevice->getDisplayName(DISPLAY_DRIVER_NAME)->data(),
                  fpDev->getDisplayName(DISPLAY_DRIVER_NAME)->data());
@@ -379,6 +399,39 @@ int DeviceHandler::release() {
     }
   }
   syslog(LOG_INFO, "Devices released.");
+
+  // Enhanced cleanup logic for all devices
+  if (fingerprintDevices != nullptr) {
+    for (FingerprintDevice *fp = fingerprintDevices; fp != nullptr;) {
+      FingerprintDevice *fp_p = fp;
+      fp = fp->next;
+      syslog(LOG_DEBUG, "Deleting fingerprint device");
+      delete fp_p;
+    }
+    fingerprintDevices = nullptr;
+  }
+
+  if (identifierDevices != nullptr) {
+    for (FingerprintDevice *fp = identifierDevices; fp != nullptr;) {
+      FingerprintDevice *fp_p = fp;
+      fp = fp->next;
+      syslog(LOG_DEBUG, "Deleting identifier device");
+      delete fp_p;
+    }
+    identifierDevices = nullptr;
+  }
+
+  if (verifierDevices != nullptr) {
+    for (FingerprintDevice *fp = verifierDevices; fp != nullptr;) {
+      FingerprintDevice *fp_p = fp;
+      fp = fp->next;
+      syslog(LOG_DEBUG, "Deleting verifier device");
+      delete fp_p;
+    }
+    verifierDevices = nullptr;
+  }
+
+  syslog(LOG_DEBUG, "DeviceHandler release completed.");
   return -1;
 }
 

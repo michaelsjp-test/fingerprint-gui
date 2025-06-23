@@ -61,9 +61,12 @@ public:
 public:
   FingerprintDevice() { fpPic.data = NULL; }
   ~FingerprintDevice() {
+    // Add debug logs to trace object lifecycle
     if (NULL != fpPic.data) {
+      syslog(LOG_DEBUG, "Freeing fpPic.data");
       free(fpPic.data);
     }
+    syslog(LOG_DEBUG, "FingerprintDevice destroyed");
   }
   virtual string *
   getDisplayName(int) = 0; // returns a display name for this device
