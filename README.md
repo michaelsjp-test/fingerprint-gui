@@ -106,6 +106,18 @@ make -j$(nproc)
 sudo make install
 ```
 
+### Running without a display
+
+Launching the GUI requires a working X11 or Wayland display server. On a
+headless system you can start the application in offscreen mode:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./fingerprint-gui
+```
+
+This prevents Qt from aborting when the `xcb` platform plugin cannot connect to
+an available display.
+
 ### Uninstall
 
 If you installed the project manually you can remove it again with:
