@@ -172,3 +172,18 @@ Copyright © 2008-2016 Wolfgang Ullrich <contact@ullrich-online.cc>
 
 Bugs can be sent directly to the author or posted in the
 [forums](http://home.ullrich-online.cc/fingerprint/Forum/).
+
+## Summary of changes
+
+- `CMakeLists.txt`: require libfprint-2, install `LICENSE.md` as `COPYING`, and add uninstall target
+- `README.md`: mention libfprint-2, Arch Linux packages, and `sudo make uninstall`
+- `bin/CMakeLists.txt`: point udev rule path to `conf/udev`
+- `cmake_uninstall.cmake.in`: new script to remove installed files
+- `include/DeviceHandler.h`: replace discovery list with `GPtrArray` and track `FpContext`
+- `include/Fingercodes.h`: switch to `FpFinger` enum
+- `include/FingerprintDevice.h`: update image helpers for `FpImage`
+- `include/Globals.h`: include libfprint-2 headers and restore Qt macros
+- `src/DeviceHandler.cpp`: create and release `FpContext`, iterate `GPtrArray`
+- `src/drivers/GenericDevice.cpp`: rewrite for new libfprint-2 API
+- `src/drivers/GenericDevice.h`: update types and API signatures
+- `upek/CMakeLists.txt`: install udev rule from `conf/udev`
