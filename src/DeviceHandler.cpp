@@ -400,8 +400,12 @@ int DeviceHandler::release() {
   }
   syslog(LOG_INFO, "Devices released.");
 
-  // Enhanced cleanup logic for all devices
+  // Cleanup logic: devices are either in fingerprintDevices OR moved to identifier/verifier lists
+  // If getIdentifiers() was called, devices are moved to identifier/verifier lists and fingerprintDevices becomes null
+  // Otherwise, all devices are in fingerprintDevices list
+  
   if (fingerprintDevices != nullptr) {
+    // Devices haven't been separated yet, delete from main list
     for (FingerprintDevice *fp = fingerprintDevices; fp != nullptr;) {
       FingerprintDevice *fp_p = fp;
       fp = fp->next;
@@ -409,26 +413,27 @@ int DeviceHandler::release() {
       delete fp_p;
     }
     fingerprintDevices = nullptr;
-  }
-
-  if (identifierDevices != nullptr) {
-    for (FingerprintDevice *fp = identifierDevices; fp != nullptr;) {
-      FingerprintDevice *fp_p = fp;
-      fp = fp->next;
-      syslog(LOG_DEBUG, "Deleting identifier device");
-      delete fp_p;
+  } else {
+    // Devices have been separated, delete from identifier and verifier lists
+    if (identifierDevices != nullptr) {
+      for (FingerprintDevice *fp = identifierDevices; fp != nullptr;) {
+        FingerprintDevice *fp_p = fp;
+        fp = fp->next;
+        syslog(LOG_DEBUG, "Deleting identifier device");
+        delete fp_p;
+      }
+      identifierDevices = nullptr;
     }
-    identifierDevices = nullptr;
-  }
 
-  if (verifierDevices != nullptr) {
-    for (FingerprintDevice *fp = verifierDevices; fp != nullptr;) {
-      FingerprintDevice *fp_p = fp;
-      fp = fp->next;
-      syslog(LOG_DEBUG, "Deleting verifier device");
-      delete fp_p;
+    if (verifierDevices != nullptr) {
+      for (FingerprintDevice *fp = verifierDevices; fp != nullptr;) {
+        FingerprintDevice *fp_p = fp;
+        fp = fp->next;
+        syslog(LOG_DEBUG, "Deleting verifier device");
+        delete fp_p;
+      }
+      verifierDevices = nullptr;
     }
-    verifierDevices = nullptr;
   }
 
   syslog(LOG_DEBUG, "DeviceHandler release completed.");
