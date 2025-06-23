@@ -12,6 +12,9 @@
  */
 
 #include <QtGui>
+#include <QDir>
+#include <QFile>
+#include <unistd.h>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -27,6 +30,12 @@ bool debugTest = false;
 string syslogIdent = string(GUI_NAME);
 
 int main(int argc, char *argv[]) {
+  if (!qEnvironmentVariableIsSet("XDG_RUNTIME_DIR")) {
+    QString runtimeDir = QDir::temp().filePath(QString("runtime-%1").arg(getuid()));
+    QDir().mkpath(runtimeDir);
+    QFile::setPermissions(runtimeDir, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+    qputenv("XDG_RUNTIME_DIR", runtimeDir.toUtf8());
+  }
   QApplication app(argc, argv);
 
   openlog(syslogIdent.data(), LOG_NDELAY | LOG_PID, LOG_AUTH);
