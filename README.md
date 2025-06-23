@@ -106,6 +106,14 @@ make -j$(nproc)
 sudo make install
 ```
 
+### Uninstall
+
+If you installed the project manually you can remove it again with:
+
+```bash
+sudo make uninstall
+```
+
 ### Add support for UPEK readers (install the bundled proprietary library `libbsapi`)
 
 ```bash
