@@ -202,11 +202,8 @@ void DeviceHandler::rescan() {
     }
 
     syslog(LOG_DEBUG, "Cleaning up old device array...");
-    if (discoveredFpDevices) {
-        syslog(LOG_DEBUG, "Setting old device array to null without unreferencing: %p", discoveredFpDevices);
-        // Don't unreference the old array as it might cause reference counting issues
-        // The FpDevice objects might be shared and managed by libfprint internally
-    }
+    if (discoveredFpDevices)
+        g_ptr_array_unref(discoveredFpDevices);
     discoveredFpDevices = newDevices;
 
     setCurrentDevice(currentDeviceIndex);
