@@ -2,19 +2,7 @@
  * SPDX-FileCopyrightText: © 2008-2016 Wolfgang Ullrich <w.ullrich@n-view.net>
  * SPDX-FileCopyrightText: 🄯 2021 Peter J. Mello <admin@petermello.net.>
  *
- * SPDX-License-Identifier: GPL-3.0-or-later    syslog(LOG_DEBUG, "Cleaning up old device array...");
-    if (discoveredFpDevices) {
-        syslog(LOG_DEBUG, "Checking old device array reference count before cleanup: %p", discoveredFpDevices);
-        // Check if the array is still valid before unreferencing
-        if (G_IS_OBJECT(discoveredFpDevices)) {
-            syslog(LOG_DEBUG, "Old device array is valid, unreferencing: %p", discoveredFpDevices);
-            g_ptr_array_unref(discoveredFpDevices);
-            syslog(LOG_DEBUG, "Unreferenced old device array: %p", discoveredFpDevices);
-        } else {
-            syslog(LOG_DEBUG, "Old device array is not a valid GObject, skipping unref: %p", discoveredFpDevices);
-        }
-    }
-    discoveredFpDevices = newDevices;-2.0
+ * SPDX-License-Identifier: GPL-3.0-or-later OR MPL-2.0
  *
  * Project "Fingerprint GUI": Services for fingerprint authentication on Linux
  * Module: DeviceHandler.cpp, DeviceHandler.h
