@@ -1,0 +1,40 @@
+# SPDX-FileCopyrightText: © 2008-2016 Wolfgang Ullrich <w.ullrich@n-view.net>
+# SPDX-FileCopyrightText: 🄯 2021 Peter J. Mello <admin@petermello.net>
+#
+# SPDX-License-Identifier: GPL-3.0-or-later OR MPL-2.0
+# ----------------------------------------------------------------------------
+# Udev rules for Fingerprint-GUI (libfprint devices)
+
+# Goodix fingerprint scanners
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="6594", \
+  MODE="0660", GROUP="plugdev", \
+  ENV{FINGERPRINT_GUI_DRIVER}="Goodix Fingerprint Device"
+
+# General libfprint device rule - covers most fingerprint scanners supported by libfprint
+SUBSYSTEM=="usb", ENV{ID_VENDOR}=="AuthenTec*", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ENV{ID_VENDOR}=="Digital*Persona*", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ENV{ID_VENDOR}=="Validity*Sensors*", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ENV{ID_VENDOR}=="STMicroelectronics*", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ENV{ID_VENDOR}=="Synaptics*", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ENV{ID_VENDOR}=="Elan*", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ENV{ID_VENDOR}=="FocalTech*", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ENV{ID_VENDOR}=="Goodix*", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ENV{ID_VENDOR}=="Next*Biometrics*", MODE="0660", GROUP="plugdev"
+
+# Additional Goodix devices
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="5110", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="5117", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="5125", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="5201", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="521d", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="5301", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="530c", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="532d", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="533c", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="5395", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="5584", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="55a2", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="55a4", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="55b4", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="6496", MODE="0660", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="27c6", ATTRS{idProduct}=="6584", MODE="0660", GROUP="plugdev"

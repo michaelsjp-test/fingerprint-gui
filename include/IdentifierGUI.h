@@ -40,7 +40,7 @@ private:
 public:
   IdentifierGUI(bool decorated, FingerprintDevice *device,
                 FingerprintData *identifyData, QWidget *parent = 0,
-                Qt::WindowFlags f = 0);
+                Qt::WindowFlags f = Qt::WindowFlags());
 
 public slots:
   void matchResult(int match, struct fp_pic_data *pic);

@@ -44,7 +44,7 @@ private:
 
 public:
   SavedDialogImpl(int mode, QWidget *parent = 0, struct fp_pic_data *pic = NULL,
-                  Qt::WindowFlags f = 0);
+                  Qt::WindowFlags f = Qt::WindowFlags());
 
 signals:
   void choice(savedDialogChoice);

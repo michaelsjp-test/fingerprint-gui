@@ -67,10 +67,10 @@ void PamGUI::CinnamonFix() {
     return;
   }
 
-  screen_num = QApplication::desktop()->screenNumber(
-      QCursor::pos()); // Screen index on multi-monitor system
-  QRect desk_rect =
-      QApplication::desktop()->screenGeometry(screen_num); // Screen geometry
+  QScreen* screen = QGuiApplication::screenAt(QCursor::pos());
+  if (!screen) screen = QGuiApplication::primaryScreen();
+  screen_num = QGuiApplication::screens().indexOf(screen);
+  QRect desk_rect = screen->geometry(); // Screen geometry
   syslog(LOG_DEBUG,
          "CinnamonFix: screen %d; left: %d; top: %d; width: %d; height: %d",
          screen_num, desk_rect.left(), desk_rect.top(), desk_rect.width(),

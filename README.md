@@ -1,7 +1,7 @@
 # Fingerprint GUI
 
 Fingerprint GUI is an application providing fingerprint-based authentication on
-Linux desktops. Based on the libfprint library, it features a simple GUI for
+Linux desktops. Based on the libfprint-2 library, it features a simple GUI for
 fingerprint management and a PAM module. Additionally, you may install the
 bundled non-free libbsapi library, in which case Fingerprint GUI will
 automatically support all fingerprint readers manufactured by UPEK, Inc.
@@ -31,15 +31,22 @@ qttranslations5-l10n qtbase5-dev-tools qttools5-dev-tools libqt5x11extras5-dev \
 ### Install dependencies
 
 In order to compile the software you will need cmake and the development
-packages for libfprint, libqca-qt5-2, libfakekey, libusb-1.0, libpolkit-qt5-1
+packages for libfprint-2, libqca-qt5-2, libfakekey, libusb-1.0, libpolkit-qt5-1
 and libpam.
 
 If you are running a recent Debian-based distribution, use the following
 command:
 
 ```bash
-sudo apt install -y cmake cmake-extras libfprint-dev libqca-qt5-2-dev \
+sudo apt install -y cmake cmake-extras libfprint-2-dev libqca-qt5-2-dev \
 libfakekey-dev libusb-1.0-0-dev libpolkit-qt5-1-dev libpam0g-dev
+```
+
+On Arch Linux systems you can install the dependencies with:
+
+```bash
+sudo pacman -S base-devel cmake qt5-base qt5-tools libfprint qca-qt5 \
+libfakekey libusb polkit-qt5 pam
 ```
 
 ### Create the build directory
@@ -97,6 +104,26 @@ make -j$(nproc)
 
 ```bash
 sudo make install
+```
+
+### Running without a display
+
+Launching the GUI requires a working X11 or Wayland display server. On a
+headless system you can start the application in offscreen mode:
+
+```bash
+QT_QPA_PLATFORM=offscreen ./fingerprint-gui
+```
+
+This prevents Qt from aborting when the `xcb` platform plugin cannot connect to
+an available display.
+
+### Uninstall
+
+If you installed the project manually you can remove it again with:
+
+```bash
+sudo make uninstall
 ```
 
 ### Add support for UPEK readers (install the bundled proprietary library `libbsapi`)
@@ -157,3 +184,18 @@ Copyright © 2008-2016 Wolfgang Ullrich <contact@ullrich-online.cc>
 
 Bugs can be sent directly to the author or posted in the
 [forums](http://home.ullrich-online.cc/fingerprint/Forum/).
+
+## Summary of changes
+
+- `CMakeLists.txt`: require libfprint-2, install `LICENSE.md` as `COPYING`, and add uninstall target
+- `README.md`: mention libfprint-2, Arch Linux packages, and `sudo make uninstall`
+- `bin/CMakeLists.txt`: point udev rule path to `conf/udev`
+- `cmake_uninstall.cmake.in`: new script to remove installed files
+- `include/DeviceHandler.h`: replace discovery list with `GPtrArray` and track `FpContext`
+- `include/Fingercodes.h`: switch to `FpFinger` enum
+- `include/FingerprintDevice.h`: update image helpers for `FpImage`
+- `include/Globals.h`: include libfprint-2 headers and restore Qt macros
+- `src/DeviceHandler.cpp`: create and release `FpContext`, iterate `GPtrArray`
+- `src/drivers/GenericDevice.cpp`: rewrite for new libfprint-2 API
+- `src/drivers/GenericDevice.h`: update types and API signatures
+- `upek/CMakeLists.txt`: install udev rule from `conf/udev`

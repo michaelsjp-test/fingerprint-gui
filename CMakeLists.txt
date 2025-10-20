@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.10)
 project(fingerprint-gui)
 
 include(FindPkgConfig)
@@ -15,7 +15,7 @@ find_package(PolkitQt5-1 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Qt5LinguistTools)
 pkg_check_modules(LIBUSB REQUIRED libusb-1.0)
-pkg_check_modules(LIBFPRINT REQUIRED libfprint)
+pkg_check_modules(LIBFPRINT REQUIRED libfprint-2)
 pkg_check_modules(FAKEKEY REQUIRED libfakekey)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
@@ -25,6 +25,7 @@ include_directories(${Qt5Core_INCLUDE_DIRS}
     ${Qt5Xml_INCLUDE_DIRS}
     ${Qt5X11Extras_INCLUDE_DIRS}
     ${Qca-qt5_INCLUDE_DIRS}
+    ${LIBFPRINT_INCLUDE_DIRS}
 
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/include"
@@ -41,11 +42,24 @@ set(QT_LIBRARIES
     ${CMAKE_THREAD_LIBS_INIT}
         )
 set(LIBEXECDIR "${CMAKE_INSTALL_PREFIX}/lib/fingerprint-gui")
+# Debugging inclusion of subdirectories
+message("Including subdirectories: src, upek, bin, locales")
 add_subdirectory(src)
 add_subdirectory(upek)
 add_subdirectory(bin)
 add_subdirectory(locales)
 
-install(FILES COPYING DESTINATION "share/doc/fingerprint-gui/")
+# Install license file
+install(FILES LICENSE.md DESTINATION "share/doc/fingerprint-gui/" RENAME COPYING)
 install(DIRECTORY DESTINATION "/var/lib/fingerprint-gui")
 install(DIRECTORY DESTINATION "/var/upek_data")
+
+# Configure uninstall target
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake_uninstall.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    IMMEDIATE @ONLY)
+
+add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
+)

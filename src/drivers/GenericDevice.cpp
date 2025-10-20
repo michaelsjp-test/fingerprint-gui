@@ -20,51 +20,86 @@
 #include <libusb-1.0/libusb.h>
 #include <pthread.h>
 #include <string>
+#include <glib.h>
+#include <glib-object.h>
 
 using namespace std;
 
-GenericDevice::GenericDevice(struct fp_dscv_dev *fp, USBDevice *knownUSBDevices)
+GenericDevice::GenericDevice(FpDevice *fp, USBDevice *knownUSBDevices)
     : FingerprintDevice() {
   fpDevice = fp;
   fpData = nullptr;
   identifyData = nullptr;
   dev = nullptr;
-  struct libusb_device_descriptor desc;
+  vendorId = 0;
+  productId = 0;
 
-  if (libusb_get_device_descriptor(fp->udev, &desc) < 0) {
-    syslog(LOG_ERR, "failed to get usb device descriptor");
-    vendorId = 0;
-    productId = 0;
-  } else {
-    vendorId = desc.idVendor;
-    productId = desc.idProduct;
+  // Check if fpDevice is valid before accessing its properties
+  if (fpDevice == nullptr) {
+    syslog(LOG_ERR, "GenericDevice: fpDevice is null");
+    driverName = string("unknown");
+    displayName = string("unknown");
+    return;
   }
 
-  driverName = string("");
-  displayName = string("");
-  driverName.append(fp_driver_get_name(fp_dscv_dev_get_driver(fpDevice)));
-  syslog(LOG_INFO,
-         "initializing libfprint device (vend/prod) 0x%x/0x%x, driver: %s",
-         vendorId, productId, driverName.data());
-  if (knownUSBDevices != nullptr) {
-    for (USBDevice *u = knownUSBDevices; u != nullptr; u = u->next) {
-      if (u->vendorID == vendorId && u->deviceID == productId) {
-        displayName.append(string(u->vendorName));
-        displayName.append(" ");
-        displayName.append(string(u->deviceName));
-        break;
-      }
-    }
+  // Safely get driver name with null check
+  const char *driver = fp_device_get_driver(fpDevice);
+  if (driver != nullptr) {
+    driverName = string(driver);
   } else {
-    displayName.append(
-        fp_driver_get_full_name(fp_dscv_dev_get_driver(fpDevice)));
+    syslog(LOG_WARNING, "GenericDevice: fp_device_get_driver returned null");
+    driverName = string("unknown");
   }
+
+  // Safely get device name with null check
+  const char *name = fp_device_get_name(fpDevice);
+  if (name != nullptr) {
+    displayName = string(name);
+  } else {
+    syslog(LOG_WARNING, "GenericDevice: fp_device_get_name returned null");
+    displayName = string("unknown");
+  }
+
+  syslog(LOG_INFO, "initializing libfprint device driver: %s", driverName.data());
+}
+
+GenericDevice::~GenericDevice() {
+  // Add debug logs to trace object lifecycle
+  if (dev != nullptr) {
+    syslog(LOG_DEBUG, "Closing device: %s", driverName.data());
+    fpDevClose();
+  }
+
+  if (fpData != nullptr) {
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing fpData: %p", fpData);
+    g_object_unref(fpData);
+    syslog(LOG_DEBUG, "Unreferenced fpData: %p", fpData);
+    fpData = nullptr;
+  }
+
+  if (identifyData != nullptr) {
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing identifyData: %p", identifyData);
+    g_ptr_array_unref(identifyData);
+    syslog(LOG_DEBUG, "Unreferenced identifyData: %p", identifyData);
+    identifyData = nullptr;
+  }
+
+  syslog(LOG_DEBUG, "GenericDevice destroyed: %s", driverName.data());
 }
 
 // Public getters and setters
 string *GenericDevice::getDisplayName(int mode) {
-  if (mode == DISPLAY_DRIVER_NAME)
+  if (mode == DISPLAY_DRIVER_NAME) {
+    if (driverName.empty()) {
+      driverName = "unknown_driver";
+    }
     return &driverName;
+  }
+  if (displayName.empty()) {
+    displayName = "unknown_device";
+  }
   return &displayName;
 }
 
@@ -80,53 +115,67 @@ void GenericDevice::setIdentifyData(FingerprintData *iData) {
     syslog(LOG_ERR, "FIXME: numPrints=0.");
     return;
   }
-  identifyData = new fp_print_data *[numPrints + 1];
-  for (d = iData, i = 0; d != nullptr; i++) {
-    identifyData[i] =
-        fp_print_data_from_data((unsigned char *)d->getData(), d->getSize());
-    d = d->next;
+  identifyData = g_ptr_array_new_with_free_func((GDestroyNotify)g_object_unref);
+  for (d = iData; d != nullptr; d = d->next) {
+    GError *error = nullptr;
+    FpPrint *p = fp_print_deserialize((const guchar *)d->getData(), d->getSize(),
+                                      &error);
+    if (error) {
+      syslog(LOG_ERR, "Failed to deserialize print: %s", error->message);
+      g_error_free(error);
+      continue;
+    }
+    g_ptr_array_add(identifyData, p);
   }
-  identifyData[numPrints] = nullptr;
 }
 
 bool GenericDevice::canIdentify() {
   bool rc = false;
-  if (fpDevice == nullptr) { // Oops!
-    syslog(LOG_ERR, "FIXME: fpDevice nullptr.");
+  if (fpDevice == nullptr) {
+    syslog(LOG_ERR, "GenericDevice::canIdentify: fpDevice is null");
     return rc;
   }
-  dev = fp_dev_open(fpDevice);
-  if (!dev) {
-    syslog(LOG_ERR, "Could not open fpDevice.");
+
+  if (!fpDevOpen(fpDevice)) {
     return rc;
-  } else {
-    if (fp_dev_supports_identification(dev) != 0) {
-      rc = true;
-    }
-    fp_dev_close(dev);
-    dev = nullptr;
   }
+
+  if (fp_device_has_feature(dev, FP_DEVICE_FEATURE_IDENTIFY))
+    rc = true;
+  fpDevClose();
   return rc;
 }
 
 int GenericDevice::getData(void **d, struct fp_pic_data **pic) {
-  int size = 0;
+  gsize size = 0;
   if (nullptr != pic)
     *pic = &fpPic;
-  if ((size = fp_print_data_get_data(fpData, (unsigned char **)d)) == 0) {
-    syslog(LOG_ERR, "Could not convert fpData!");
+  guchar *data = nullptr;
+  GError *error = nullptr;
+  if (!fp_print_serialize(fpData, &data, &size, &error)) {
+    syslog(LOG_ERR, "Could not serialize fpData: %s", error ? error->message : "unknown");
+    if (error)
+      g_error_free(error);
+    return 0;
   }
-  fp_print_data_free(fpData);
+  *d = data;
+  g_object_unref(fpData);
   fpData = nullptr;
-  return size;
+  return (int)size;
 }
 
 void GenericDevice::setData(void *d, int size) {
   if (fpData != nullptr) {
-    fp_print_data_free(fpData);
+    g_object_unref(fpData);
     fpData = nullptr;
   }
-  fpData = fp_print_data_from_data((unsigned char *)d, size);
+  GError *error = nullptr;
+  fpData = fp_print_deserialize((const guchar *)d, size, &error);
+  if (error) {
+    syslog(LOG_ERR, "Failed to deserialize print data: %s", error->message);
+    g_error_free(error);
+    fpData = nullptr;
+  }
 }
 
 // Here we go...
@@ -149,72 +198,43 @@ void GenericDevice::run() {
   syslog(LOG_DEBUG, "Thread ended normally.");
 }
 
-static void sync_close_cb(struct fp_dev *dev, void *user_data) {
-  Q_UNUSED(dev);
-  bool *closed = (bool *)user_data;
-  *closed = true;
-}
-
 void GenericDevice::stop() {
-  bool stopped;
-
   if (dev == nullptr)
     return;
-  syslog(LOG_DEBUG, "FP_DEV_STOP.");
-
-  wait(1000);
-  switch (mode) {
-  case MODE_VERIFY:
-    syslog(LOG_DEBUG, "FP_ASYNC_VERIFY_STOP.");
-    if (fp_async_verify_stop(dev, sync_close_cb, &stopped) == 0) {
-      while (!stopped)
-        if (fp_handle_events() < 0)
-          break;
-    }
-    break;
-  case MODE_ACQUIRE:
-    syslog(LOG_DEBUG, "FP_ASYNC_ENROLL_STOP.");
-    if (fp_async_enroll_stop(dev, sync_close_cb, &stopped) == 0) {
-      while (!stopped)
-        if (fp_handle_events() < 0)
-          break;
-    }
-    break;
-  case MODE_IDENTIFY:
-    syslog(LOG_DEBUG, "FP_ASYNC_IDENTIFY_STOP.");
-    if (fp_async_identify_stop(dev, sync_close_cb, &stopped) == 0) {
-      while (!stopped)
-        if (fp_handle_events() < 0)
-          break;
-    }
-    break;
-  }
-
   fpDevClose();
-  return;
 }
 
 // Open the fingerprint_device
-bool GenericDevice::fpDevOpen(struct fp_dscv_dev *fpDevice) {
+bool GenericDevice::fpDevOpen(FpDevice *fpDevice) {
   if (fpDevice == nullptr) {
-    syslog(LOG_ERR, "FIXME: fpDevice nullptr.");
+    syslog(LOG_ERR, "GenericDevice::fpDevOpen: fpDevice is null");
     return false;
   }
-  dev = fp_dev_open(fpDevice);
-  if (!dev) {
-    syslog(LOG_ERR, "Could not open fpDevice.");
+
+  GError *error = nullptr;
+  if (!fp_device_open_sync(fpDevice, nullptr, &error)) {
+    syslog(LOG_ERR, "Could not open fpDevice: %s", error ? error->message : "unknown");
+    if (error)
+      g_error_free(error);
     return false;
   }
+  dev = fpDevice;
   return true;
 }
 
 bool GenericDevice::fpDevClose() {
   if (!dev) {
-    syslog(LOG_ERR, "FIXME: dev nullptr (fpDevClose).");
+    syslog(LOG_DEBUG, "GenericDevice::fpDevClose: dev is already null");
     return false;
   }
+
   syslog(LOG_DEBUG, "FP_DEV_CLOSE.");
-  fp_dev_close(dev);
+  GError *error = nullptr;
+  if (!fp_device_close_sync(dev, nullptr, &error)) {
+    syslog(LOG_ERR, "Failed to close device: %s", error ? error->message : "unknown");
+    if (error)
+      g_error_free(error);
+  }
   dev = nullptr;
   return true;
 }
@@ -223,77 +243,10 @@ void GenericDevice::setTimeout(bool) {
   // Nothing to do here
 }
 
-// Translate fingerprint messages into our result codes
-int translateVerify(int fp_result) {
-  int rc = -1;
-  switch (fp_result) {
-  case FP_VERIFY_MATCH:
-    syslog(LOG_DEBUG, "FP_VERIFY_MATCH.");
-    rc = RESULT_VERIFY_MATCH;
-    break;
-  case FP_VERIFY_NO_MATCH:
-    syslog(LOG_DEBUG, "FP_VERIFY_NO_MATCH.");
-    rc = RESULT_VERIFY_NO_MATCH;
-    break;
-  case FP_VERIFY_RETRY:
-    syslog(LOG_DEBUG, "FP_VERIFY_RETRY.");
-    rc = RESULT_VERIFY_RETRY;
-    break;
-  case FP_VERIFY_RETRY_CENTER_FINGER:
-    syslog(LOG_DEBUG, "FP_VERIFY_RETRY_CENTER_FINGER.");
-    rc = RESULT_VERIFY_RETRY_CENTER;
-    break;
-  case FP_VERIFY_RETRY_REMOVE_FINGER:
-    syslog(LOG_DEBUG, "FP_VERIFY_RETRY_REMOVE_FINGER.");
-    rc = RESULT_VERIFY_RETRY_REMOVE;
-    break;
-  case FP_VERIFY_RETRY_TOO_SHORT:
-    syslog(LOG_DEBUG, "FP_VERIFY_RETRY_TOO_SHORT.");
-    rc = RESULT_VERIFY_RETRY_TOO_SHORT;
-    break;
-  }
-  return rc;
-}
-
-// Translate fingerprint messages into our result codes
-int translateAcquire(int fp_result) {
-  int rc = -1;
-  switch (fp_result) {
-  case FP_ENROLL_COMPLETE:
-    syslog(LOG_DEBUG, "FP_ENROLL_COMPLETE.");
-    rc = RESULT_ENROLL_COMPLETE;
-    break;
-  case FP_ENROLL_FAIL:
-    syslog(LOG_DEBUG, "FP_ENROLL_FAIL.");
-    rc = RESULT_ENROLL_FAIL;
-    break;
-  case FP_ENROLL_PASS:
-    syslog(LOG_DEBUG, "FP_ENROLL_PASS.");
-    rc = RESULT_ENROLL_PASS;
-    break;
-  case FP_ENROLL_RETRY:
-    syslog(LOG_DEBUG, "FP_ENROLL_RETRY.");
-    rc = RESULT_ENROLL_RETRY;
-    break;
-  case FP_ENROLL_RETRY_CENTER_FINGER:
-    syslog(LOG_DEBUG, ".");
-    rc = RESULT_ENROLL_RETRY_CENTER;
-    break;
-  case FP_ENROLL_RETRY_REMOVE_FINGER:
-    syslog(LOG_DEBUG, "FP_ENROLL_RETRY_REMOVE_FINGER.");
-    rc = RESULT_ENROLL_RETRY_REMOVE;
-    break;
-  case FP_ENROLL_RETRY_TOO_SHORT:
-    syslog(LOG_DEBUG, "FP_ENROLL_RETRY_TOO_SHORT.");
-    rc = RESULT_ENROLL_RETRY_TOO_SHORT;
-    break;
-  }
-  return rc;
-}
-
 // Run a verification task
 bool GenericDevice::verify() {
-  int result;
+  gboolean match = FALSE;
+  FpPrint *scan = nullptr;
 
   if (fpDevice != nullptr) {
     if (!fpDevOpen(fpDevice)) {
@@ -302,43 +255,38 @@ bool GenericDevice::verify() {
       return false;
     }
   }
-  emit neededStages(1); // Always "1" for verification
-  do {
-    emit verifyResult(RESULT_SWIPE, &fpPic);
-    sleep(1); // I don't know what this is good for; I found it in some sample
-              // code of libfprint...
-    //        result=fp_verify_finger(dev,fpData);
-    // "img" to be used in later version
-    struct fp_img *img = nullptr;
-    result = fp_verify_finger_img(dev, fpData, &img);
-    // "img" to be used in later version
-    if (img) {
-      syslog(LOG_DEBUG, "Verify: have image.");
-      img_to_pixmap(img);
-      fp_img_free(img);
-    } else {
-      img_to_pixmap(nullptr);
-    }
-    if (result < 0) {
-      syslog(LOG_ERR, "Verify failed with error %d.", result);
-    }
-    emit verifyResult(translateVerify(result), &fpPic);
-  } while (result != FP_VERIFY_NO_MATCH && result != FP_VERIFY_MATCH);
-  fpDevClose();
-  // This is for identifying with "no identifying" devices
-  if (result == FP_VERIFY_MATCH) {
-    syslog(LOG_DEBUG, "Verify result FP_VERIFY_MATCH.");
-    emit matchResult(0, &fpPic);
-  } else {
-    syslog(LOG_DEBUG, "Verify result FP_VERIFY_NO_MATCH.");
+  emit neededStages(1);
+  emit verifyResult(RESULT_SWIPE, &fpPic);
+  GError *error = nullptr;
+  if (!fp_device_verify_sync(dev, fpData, nullptr, nullptr, nullptr, &match,
+                             &scan, &error)) {
+    syslog(LOG_ERR, "Verify failed: %s", error ? error->message : "unknown");
+    if (error)
+      g_error_free(error);
+    emit verifyResult(RESULT_VERIFY_RETRY, &fpPic);
+    fpDevClose();
     emit matchResult(-1, &fpPic);
+    return false;
   }
+  if (scan) {
+    FpImage *img = fp_print_get_image(scan);
+    if (img)
+      img_to_pixmap(img);
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing scan: %p", scan);
+    g_object_unref(scan);
+    syslog(LOG_DEBUG, "Unreferenced scan: %p", scan);
+  } else {
+    img_to_pixmap(nullptr);
+  }
+  emit verifyResult(match ? RESULT_VERIFY_MATCH : RESULT_VERIFY_NO_MATCH, &fpPic);
+  fpDevClose();
+  emit matchResult(match ? 0 : -1, &fpPic);
   return true;
 }
 
 // Run an enrollment task
 bool GenericDevice::acquire() {
-  int result;
   mode = MODE_ACQUIRE;
   if (fpDevice != nullptr) {
     if (!fpDevOpen(fpDevice)) {
@@ -348,30 +296,25 @@ bool GenericDevice::acquire() {
     }
   }
 
-  emit neededStages(1); // We use a dynamic number of needed stages
-  do {
-    emit acquireResult(RESULT_SWIPE);
-    sleep(1); // I don't know what this is good for; I found it in some sample
-              // code of libfprint...
-    // result=fp_enroll_finger(dev,&fpData);
-    // "img" to be used in later version
-    struct fp_img *img = nullptr;
-    result = fp_enroll_finger_img(dev, &fpData, &img);
-    if (img) {
-      syslog(LOG_DEBUG, "Acquire: have image.");
+  emit neededStages(1);
+  emit acquireResult(RESULT_SWIPE);
+  GError *error = nullptr;
+  fpData = fp_device_enroll_sync(dev, nullptr, nullptr, nullptr, nullptr, &error);
+  if (error) {
+    syslog(LOG_ERR, "Acquire failed: %s", error->message);
+    g_error_free(error);
+    fpDevClose();
+    emit acquireResult(RESULT_ENROLL_FAIL);
+    return false;
+  }
+  if (fpData) {
+    FpImage *img = fp_print_get_image(fpData);
+    if (img)
       img_to_pixmap(img);
-      fp_img_free(img);
-    } else {
-      img_to_pixmap(nullptr);
-    }
-    if (result < 0) {
-      syslog(LOG_ERR, "Acquire failed with error %d.", result);
-    } else {
-      syslog(LOG_DEBUG, "Acquire result %d.", result);
-    }
-    emit acquireResult(translateAcquire(result));
-  } while (result != FP_ENROLL_COMPLETE);
-  syslog(LOG_DEBUG, "Acquire result FP_ENROLL_COMPLETE.");
+  } else {
+    img_to_pixmap(nullptr);
+  }
+  emit acquireResult(RESULT_ENROLL_COMPLETE);
   fpDevClose();
   return true;
 }
@@ -387,7 +330,7 @@ bool GenericDevice::identify() {
     if (!fpDevOpen(fpDevice)) {
       syslog(LOG_ERR, "Could not open generic device (identify).");
       if (fpData != nullptr) {
-        fp_print_data_free(fpData);
+        g_object_unref(fpData);
         fpData = nullptr;
       }
       emit noDeviceOpen();
@@ -395,27 +338,48 @@ bool GenericDevice::identify() {
     }
   }
 
-  struct fp_img *img = nullptr;
-  int result =
-      fp_identify_finger_img(dev, identifyData, (size_t *)&match, &img);
-  // result=fp_identify_finger(dev,identifyData,(size_t*)&match);
-  if (img) {
-    syslog(LOG_DEBUG, "Identify: have image.");
-    img_to_pixmap(img);
-    fp_img_free(img);
+  FpPrint *match_print = nullptr;
+  FpPrint *scan = nullptr;
+  GError *error = nullptr;
+  if (!fp_device_identify_sync(dev, identifyData, nullptr, nullptr, nullptr,
+                               &match_print, &scan, &error)) {
+    syslog(LOG_ERR, "Identify failed: %s", error ? error->message : "unknown");
+    if (error)
+      g_error_free(error);
+    fpDevClose();
+    emit matchResult(-1, &fpPic);
+    return false;
+  }
+  if (scan) {
+    FpImage *img = fp_print_get_image(scan);
+    if (img)
+      img_to_pixmap(img);
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing scan: %p", scan);
+    g_object_unref(scan);
+    syslog(LOG_DEBUG, "Unreferenced scan: %p", scan);
   } else {
     img_to_pixmap(nullptr);
   }
-  if (result < 0) {
-    syslog(LOG_ERR, "Identify failed with error %d.", result);
-    match = -1L;
+  if (match_print) {
+    for (guint i = 0; i < identifyData->len; i++) {
+      FpPrint *p = (FpPrint *)g_ptr_array_index(identifyData, i);
+      if (fp_print_equal(match_print, p)) {
+        match = i;
+        break;
+      }
+    }
+    // Debugging before unref
+    syslog(LOG_DEBUG, "Unreferencing match_print: %p", match_print);
+    g_object_unref(match_print);
+    syslog(LOG_DEBUG, "Unreferenced match_print: %p", match_print);
   }
   fpDevClose();
   if (fpData != nullptr) {
-    fp_print_data_free(fpData);
+    g_object_unref(fpData);
     fpData = nullptr;
   }
-  syslog(LOG_DEBUG, "Match result %u.", (int)match);
+  syslog(LOG_DEBUG, "Match result %ld.", match);
   emit matchResult(match, &fpPic);
   return true;
 }

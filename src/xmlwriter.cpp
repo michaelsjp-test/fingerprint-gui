@@ -46,7 +46,7 @@ XmlWriter::XmlWriter( QIODevice *device/*, QTextCodec *codec */)
 XmlWriter::~XmlWriter()
 {
     if ( autoNewLine && !atBeginningOfLine )
-	out << endl;
+	out << Qt::endl;
 }
 
 QString XmlWriter::protect( const QString& string )
@@ -82,7 +82,7 @@ void XmlWriter::writePendingIndent()
 
 void XmlWriter::newLine()
 {
-    out << endl;
+    out << Qt::endl;
     atBeginningOfLine = true;
 }
 

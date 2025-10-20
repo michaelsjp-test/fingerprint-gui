@@ -17,17 +17,17 @@
 #include "Globals.h"
 
 // This translates my own finger codes like represented in "fingers[]" to the
-// enum fp_finger
-static const fp_finger fingerCode[10] = {
-    LEFT_LITTLE,
-    LEFT_RING,
-    LEFT_MIDDLE,
-    LEFT_INDEX,
-    LEFT_THUMB,
-    RIGHT_THUMB,
-    RIGHT_INDEX,
-    RIGHT_MIDDLE,
-    RIGHT_RING,
-    RIGHT_LITTLE};
+// enum FpFinger
+static const FpFinger fingerCode[10] = {
+    FP_FINGER_LEFT_LITTLE,
+    FP_FINGER_LEFT_RING,
+    FP_FINGER_LEFT_MIDDLE,
+    FP_FINGER_LEFT_INDEX,
+    FP_FINGER_LEFT_THUMB,
+    FP_FINGER_RIGHT_THUMB,
+    FP_FINGER_RIGHT_INDEX,
+    FP_FINGER_RIGHT_MIDDLE,
+    FP_FINGER_RIGHT_RING,
+    FP_FINGER_RIGHT_LITTLE};
 
 #endif /* _FINGERCODES_H */

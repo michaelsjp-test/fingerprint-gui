@@ -28,83 +28,61 @@
 #include <QDir>
 #include <QFile>
 #include <QtCrypto>
-#include <QtXml>
+#include <QXmlStreamReader>
 
 using namespace std;
 
-class SettingsParser : public QXmlDefaultHandler {
+class SettingsParser {
 private:
   UserSettings *obj;
-  bool inSettings;
 
 public:
   SettingsParser(UserSettings *obj) { this->obj = obj; }
 
-  bool startDocument() {
-    inSettings = false;
-    return true;
-  }
+  bool parseXml(QIODevice *device) {
+    QXmlStreamReader reader(device);
+    bool inSettings = false;
 
-  bool endElement(const QString &, const QString &, const QString &name) {
-    if (name == "object") {
-      inSettings = false;
-    }
-    return true;
-  }
+    while (!reader.atEnd()) {
+      reader.readNext();
 
-  bool startElement(const QString &, const QString &, const QString &name,
-                    const QXmlAttributes &attrs) {
-    if (inSettings && attrs.count() > 0) {
-      if (name == "providePassword") {
-        if (attrs.localName(0) == "value") {
-          if (attrs.value(0) == "true") {
-            obj->providePassword = true;
-            //                        syslog(LOG_DEBUG,"Setting %s to
-            //                        %s.",name.toStdString().data(),"true");
+      if (reader.isStartElement()) {
+        QString name = reader.name().toString();
+        QXmlStreamAttributes attrs = reader.attributes();
+
+        if (name == "object" && attrs.hasAttribute("class") &&
+            attrs.value("class") == "UserSettings") {
+          inSettings = true;
+        } else if (inSettings && attrs.hasAttribute("value")) {
+          QString value = attrs.value("value").toString();
+
+          if (name == "providePassword") {
+            obj->providePassword = (value == "true");
+          } else if (name == "uuid") {
+            obj->uuid = value;
+          } else if (name == "pathToPassword") {
+            obj->pathToPassword = value;
+          } else if (name == "iv") {
+            obj->xIv = value;
+          } else if (name == "key") {
+            obj->xKey = value;
+          } else if (name == "pass") {
+            obj->xPass = value;
           }
         }
-      }
-      if (name == "uuid") {
-        if (attrs.localName(0) == "value") {
-          obj->uuid = QString(attrs.value(0));
-          // syslog(LOG_DEBUG,"Setting %s to
-          // s.",name.toStdString().data(),attrs.value(0).toStdString().data());
-        }
-      }
-      if (name == "pathToPassword") {
-        if (attrs.localName(0) == "value") {
-          obj->pathToPassword = QString(attrs.value(0));
-          // syslog(LOG_DEBUG,"Setting %s to
-          //%s.",name.toStdString().data(),attrs.value(0).toStdString().data());
-        }
-      }
-      if (name == "iv") {
-        if (attrs.localName(0) == "value") {
-          obj->xIv = QString(attrs.value(0));
-          // syslog(LOG_DEBUG,"Setting %s to
-          //%s.",name.toStdString().data(),attrs.value(0).toStdString().data());
-        }
-      }
-      if (name == "key") {
-        if (attrs.localName(0) == "value") {
-          obj->xKey = QString(attrs.value(0));
-          // syslog(LOG_DEBUG,"Setting %s to
-          //%s.",name.toStdString().data(),attrs.value(0).toStdString().data());
-        }
-      }
-      if (name == "pass") {
-        if (attrs.localName(0) == "value") {
-          obj->xPass = QString(attrs.value(0));
-          // syslog(LOG_DEBUG,"Setting %s to
-          //%s.",name.toStdString().data(),attrs.value(0).toStdString().data());
+      } else if (reader.isEndElement()) {
+        QString name = reader.name().toString();
+        if (name == "object") {
+          inSettings = false;
         }
       }
     }
-    if (name == "object" && attrs.count() > 0) {
-      if (attrs.localName(0) == "class" && attrs.value(0) == "UserSettings") {
-        inSettings = true;
-      }
+
+    if (reader.hasError()) {
+      syslog(LOG_ERR, "XML parsing error: %s", reader.errorString().toStdString().data());
+      return false;
     }
+
     return true;
   }
 };
@@ -170,10 +148,9 @@ UserSettings::UserSettings(char *userName, bool debug) {
          configFile.fileName().toStdString().data());
   // Restore settings from config.xml
   SettingsParser handler(this);
-  QXmlInputSource configSource(&configFile);
-  QXmlSimpleReader reader;
-  reader.setContentHandler(&handler);
-  reader.parse(configSource);
+  if (!handler.parseXml(&configFile)) {
+    syslog(LOG_ERR, "Failed to parse config file.");
+  }
   configFile.close();
   if (geteuid() != 0) { // Not running as root (temporary file must be deleted)
     if (unlink("/tmp/read-config.xml")) {
@@ -212,8 +189,10 @@ UserSettings::UserSettings(char *userName, bool debug) {
     syslog(LOG_DEBUG, "Open file %s for reading.",
            passwordFile.fileName().toStdString().data());
     // Restore encrypted password from user@machine.xml
-    QXmlInputSource passwdSource(&passwordFile);
-    reader.parse(passwdSource);
+    SettingsParser passwdHandler(this);
+    if (!passwdHandler.parseXml(&passwordFile)) {
+      syslog(LOG_ERR, "Failed to parse password file.");
+    }
     passwordFile.close();
     // Force unmounting media for security reason, if it wasn't mounted before
     if (umountRequired) { // Media was not mounted before

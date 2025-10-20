@@ -50,7 +50,7 @@ public:
   PolkitDialogImpl(const QString &actionId, const QString &message,
                    const QString &iconName, const PolkitQt1::Details &details,
                    const PolkitQt1::Identity::List &identities,
-                   QWidget *parent = nullptr, Qt::WindowFlags f = nullptr);
+                   QWidget *parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
   virtual ~PolkitDialogImpl();
   QString password() const;
   void authenticationFailure();

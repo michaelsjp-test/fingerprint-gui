@@ -96,3 +96,6 @@ CMakeLists.txt.user*
 
 # Project specific files
 /build
+
+# CMakeFiles
+CMakeFiles/

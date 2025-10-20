@@ -15,6 +15,9 @@
 #define _GLOBALS_H
 
 #include <syslog.h>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QCursor>
 
 #define VERSION "1.09"
 #define COPYRIGHT "© 2008-2016 Wolfgang Ullrich"
@@ -25,8 +28,21 @@
 #define LICENSE "https://www.gnu.org/licenses/gpl-3.0-standalone.html"
 
 extern "C" {
-#include <libfprint/fprint.h>
+#ifdef signals
+#undef signals
+#endif
+#include <libfprint-2/fprint.h>
 }
+// Restore Qt's signal macro after including libfprint headers
+#ifdef Q_MOC_RUN
+#ifndef signals
+#define signals public
+#endif
+#else
+#ifndef QT_NO_SIGNALS_SLOTS_KEYWORDS
+#define signals Q_SIGNALS
+#endif
+#endif
 
 #define _MULTI_THREADED
 
@@ -109,8 +125,9 @@ extern "C" {
 
 #define PLACE_DIALOG_TO_SCREEN_WHERE_CURSOR_IS                                 \
   int h = height();                                                            \
-  QRect desk_rect = QApplication::desktop()->screenGeometry(                   \
-      QApplication::desktop()->screenNumber(QCursor::pos()));                  \
+  QScreen* screen = QGuiApplication::screenAt(QCursor::pos());                 \
+  if (!screen) screen = QGuiApplication::primaryScreen();                      \
+  QRect desk_rect = screen->geometry();                                        \
   int x = desk_rect.left();                                                    \
   int y = desk_rect.height() - h + desk_rect.top();                            \
   int w = desk_rect.width();                                                   \
